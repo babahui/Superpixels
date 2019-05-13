@@ -12,7 +12,7 @@ from torchvision.models.vgg import VGG
 class FCN32s(nn.Module):
 
     def __init__(self, pretrained_net, n_class):
-        super().__init__()
+        super(FCN32s, self).__init__()
         self.n_class = n_class
         self.pretrained_net = pretrained_net
         self.relu    = nn.ReLU(inplace=True)
@@ -45,7 +45,7 @@ class FCN32s(nn.Module):
 class FCN16s(nn.Module):
 
     def __init__(self, pretrained_net, n_class):
-        super().__init__()
+        super(FCN16s, self).__init__()
         self.n_class = n_class
         self.pretrained_net = pretrained_net
         self.relu    = nn.ReLU(inplace=True)
@@ -80,7 +80,7 @@ class FCN16s(nn.Module):
 class FCN8s(nn.Module):
 
     def __init__(self, pretrained_net, n_class):
-        super().__init__()
+        super(FCN8s, self).__init__()
         self.n_class = n_class
         self.pretrained_net = pretrained_net
         self.relu    = nn.ReLU(inplace=True)
@@ -117,7 +117,7 @@ class FCN8s(nn.Module):
 class FCNs(nn.Module):
 
     def __init__(self, pretrained_net, n_class):
-        super().__init__()
+        super(FCNs, self).__init__()
         self.n_class = n_class
         self.pretrained_net = pretrained_net
         self.relu    = nn.ReLU(inplace=True)
@@ -141,10 +141,10 @@ class FCNs(nn.Module):
         x2 = output['x2']  # size=(N, 128, x.H/4,  x.W/4)
         x1 = output['x1']  # size=(N, 64, x.H/2,  x.W/2)
 
-        score = self.bn1(self.relu(self.deconv1(x5)))     # size=(N, 512, x.H/16, x.W/16)
-        score = score + x4                                # element-wise add, size=(N, 512, x.H/16, x.W/16)
-        score = self.bn2(self.relu(self.deconv2(score)))  # size=(N, 256, x.H/8, x.W/8)
-        score = score + x3                                # element-wise add, size=(N, 256, x.H/8, x.W/8)
+        score_1 = self.bn1(self.relu(self.deconv1(x5)))     # size=(N, 512, x.H/16, x.W/16)
+        score = score_1 + x4                                # element-wise add, size=(N, 512, x.H/16, x.W/16)
+        score_2 = self.bn2(self.relu(self.deconv2(score)))  # size=(N, 256, x.H/8, x.W/8)
+        score = score_2 + x3                                # element-wise add, size=(N, 256, x.H/8, x.W/8)
         score = self.bn3(self.relu(self.deconv3(score)))  # size=(N, 128, x.H/4, x.W/4)
         score = score + x2                                # element-wise add, size=(N, 128, x.H/4, x.W/4)
         score = self.bn4(self.relu(self.deconv4(score)))  # size=(N, 64, x.H/2, x.W/2)
@@ -152,12 +152,14 @@ class FCNs(nn.Module):
         score = self.bn5(self.relu(self.deconv5(score)))  # size=(N, 32, x.H, x.W)
         score = self.classifier(score)                    # size=(N, n_class, x.H/1, x.W/1)
 
-        return score  # size=(N, n_class, x.H/1, x.W/1)
+        return score, x1, x3
+    # size=(N, n_class, x.H/1, x.W/1)
 
 
 class VGGNet(VGG):
     def __init__(self, pretrained=True, model='vgg16', requires_grad=True, remove_fc=True, show_params=False):
-        super().__init__(make_layers(cfg[model]))
+        super(VGGNet, self).__init__(make_layers(cfg[model]))
+
         self.ranges = ranges[model]
 
         if pretrained:
