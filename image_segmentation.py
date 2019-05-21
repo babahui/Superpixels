@@ -38,6 +38,8 @@ from sklearn.preprocessing import normalize
 from imageio import imread
 
 from scipy.spatial import distance
+from skimage.feature.texture import local_binary_pattern
+import time
 
 
 def normal_image_segmentation(m_img, sp_mode="similarity", sp_connectivity=4, num_cuts=2, n_iter=1000, graph_met='lib_met'):
@@ -169,7 +171,7 @@ def normal_image_segmentation(m_img, sp_mode="similarity", sp_connectivity=4, nu
 #     return p_label, labels, ev1, ev2, ev3, sp_label
 
 
-def large_image_seg(img_path="train/35070", sp_num=1000, sp_mode="similarity", sp_connectivity=2, num_cuts=3, admm_met='admm', thres_cons=3, n_iter=1000, graph_met='lib_met', dens_coff=3, lambda_coff=None, merge=False, dist_hist=False):
+def large_image_seg(img_path="train/35070", sp_num=400, sp_mode="similarity", sp_connectivity=2, num_cuts=3, admm_met='admm', thres_cons=3, n_iter=1000, graph_met='lib_met', dens_coff=3, lambda_coff=None, merge=False, dist_hist=False):
     # read image
 #     base_name = os.getcwd()
 #     m_img = scipy.misc.imread(join(base_name, img_path))
@@ -441,14 +443,28 @@ def syn_graph_met(m_img, segments, lambda_coff, dist_hist=False):
     # for i in range(length):
     #     for j in range(length):
     #         graph[i, j] = abs(average[i] - average[j]) ** 2
-
+    
+    graph_time = time.time()
+    
     # fully connected
     sigma = 255.0
     length = len(position)
     graph = np.zeros((length, length))
+    
+    # settings for LBP
+    radius = 2
+    n_points = 8 * radius
+    METHOD = 'uniform'
+    
+    img, lbp = [], []
+    for i in range(3):
+        c_img = image[:,:,i]
+        c_lbp = local_binary_pattern(c_img, n_points, radius, METHOD)
+        img.append(c_img)
+        lbp.append(c_lbp)
+    
     for i in range(length):
-        for j in range(length):
-            
+        for j in range(length):     
             if not dist_hist:
                 diff = abs(red_average[i]-red_average[j]) + abs(green_average[i]-green_average[j]) + abs(blue_average[i]-blue_average[j])
                 if lambda_coff:
@@ -456,15 +472,16 @@ def syn_graph_met(m_img, segments, lambda_coff, dist_hist=False):
                     diff = diff + lambda_coff * dist 
             else:
                 # reads an input image, color mode
-                hist1 = hist(flatten_position[i], image)
-                hist2 = hist(flatten_position[j], image)
+                hist1 = hist(flatten_position[i], img, lbp)
+                hist2 = hist(flatten_position[j], img, lbp)
                 
                 diff = abs(distance.cityblock(hist1, hist2))
                 
             graph[i, j] = diff
             # graph[i, j] = math.e ** (-(diff ** 2) / sigma)
 
-            
+    print('graph construction time: ', time.time() - graph_time)    
+    
     # matrix eigen-decomposition, scipy.sparse.linalg
     vals, vectors = np.linalg.eigh(graph)
     vals, vectors = np.real(vals), np.real(vectors)
@@ -485,23 +502,39 @@ def syn_graph_met(m_img, segments, lambda_coff, dist_hist=False):
     return ev1, ev2, ev3
 
 
-def hist(position, img_mat):
-    color_hist = []
+def hist(position, img, lbp):
+    
+    # color hist: for each channel * 16 bins
     # find frequency of pixels in range 0-255, calculate histogram of blue, green or red channel respectively.
+    color_hist = []
     for i in range(3):
-        c_img = img_mat[:,:,i]
+        c_img = img[i]
         sp_arr = np.take(c_img, position)
                 
-        histr, bins = np.histogram(sp_arr, bins=np.arange(257))
-
-        histr = np.reshape(histr, (16, 16)) # 16 bins
-        histr = np.sum(histr, axis=1)  
-        
+        histr, bins = np.histogram(sp_arr, bins=np.linspace(0, 256, num=21))
+#         histr = np.reshape(histr, (16, 16)) # 16 bins
+#         histr = np.sum(histr, axis=1)  
         color_hist.append(histr)
         
-    hist = normalize(color_hist).flatten()
-    hist = np.asarray(hist)
-    return hist
+    color_hist = normalize(color_hist).flatten()
+    color_hist = np.asarray(color_hist)
+    
+    # texture hist, for each channel, orientation * 10 bins
+    texture_hist = []
+    for i in range(3):
+        c_lbp = lbp[i]
+        sp_lbp = np.take(c_lbp, position)
+            
+        n_bins = int(sp_lbp.max() + 1)
+        histr, _ = np.histogram(sp_lbp, density=True, bins=np.linspace(0, n_bins, num=11))
+        texture_hist.append(histr)
+    
+    texture_hist = normalize(texture_hist).flatten()
+    texture_hist = np.asarray(texture_hist)   
+        
+    hist = np.append(color_hist, texture_hist)
+#     print('-----hist--------', hist.shape)
+    return np.append(color_hist, texture_hist)
     
 if __name__ == "__main__":
     # image_list = ["2018", "3063", "5096", "6046", "8068", "10081", "14085", "14092", "15011", "15062"]
