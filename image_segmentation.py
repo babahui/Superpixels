@@ -179,8 +179,8 @@ def large_image_seg(img_path="train/35070", sp_num=400, sp_mode="similarity", sp
     m_img = imread(img_path)
     
     # do the superpixels method
-#     segments = slic(m_img, compactness=30, n_segments=sp_num)
-    segments = felzenszwalb(m_img, scale=10, sigma=0.5, min_size=100)
+    segments = slic(m_img, compactness=30, n_segments=sp_num)
+#     segments = felzenszwalb(m_img, scale=10, sigma=0.5, min_size=100)
 
     # generate graph matrix
     import warnings
